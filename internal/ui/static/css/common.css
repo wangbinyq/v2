@@ -24,7 +24,9 @@ hr {
     padding-bottom: 10px;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
     color: var(--title-color);
 }
 
@@ -262,7 +264,7 @@ a:hover {
 }
 
 #toast-msg {
-    background-color: rgba(0,0,0,0.7);
+    background-color: rgba(0, 0, 0, 0.7);
     padding-bottom: 4px;
     padding-left: 4px;
     padding-right: 5px;
@@ -274,11 +276,34 @@ a:hover {
 }
 
 @keyframes toastKeyFrames {
-    0% {visibility: hidden; opacity: 0;}
-    25% {visibility: visible; opacity: 1; z-index: 9999}
-    50% {visibility: visible; opacity: 1; z-index: 9999}
-    75% {visibility: visible; opacity: 1; z-index: 9999}
-    100% {visibility: hidden; opacity: 0; z-index: 0}
+    0% {
+        visibility: hidden;
+        opacity: 0;
+    }
+
+    25% {
+        visibility: visible;
+        opacity: 1;
+        z-index: 9999
+    }
+
+    50% {
+        visibility: visible;
+        opacity: 1;
+        z-index: 9999
+    }
+
+    75% {
+        visibility: visible;
+        opacity: 1;
+        z-index: 9999
+    }
+
+    100% {
+        visibility: hidden;
+        opacity: 0;
+        z-index: 0
+    }
 }
 
 /* Hide the logo when there is not enough space to display menus when using languages more verbose than English */
@@ -321,7 +346,8 @@ a:hover {
         display: none;
     }
 
-    .header ul:not(.js-menu-show), .header ul.js-menu-show {
+    .header ul:not(.js-menu-show),
+    .header ul.js-menu-show {
         display: revert;
     }
 
@@ -347,11 +373,14 @@ table {
     border-collapse: collapse;
 }
 
-table, th, td {
+table,
+th,
+td {
     border: 1px solid var(--table-border-color);
 }
 
-th, td {
+th,
+td {
     padding: 5px;
     text-align: left;
 }
@@ -426,7 +455,8 @@ input[type="number"] {
     width: 250px;
     font-size: 99%;
     margin-top: 5px;
-    margin-bottom: 10px;;
+    margin-bottom: 10px;
+    ;
     appearance: none;
 }
 
@@ -489,7 +519,7 @@ input::placeholder {
     margin-left: 10px;
 }
 
-details > summary {
+details>summary {
     outline: none;
     cursor: pointer;
 }
@@ -643,7 +673,7 @@ template {
     right: 0;
     font-size: 1.7em;
     color: #ccc;
-    padding:0 .2em;
+    padding: 0 .2em;
     margin: 10px;
     text-decoration: none;
     background-color: transparent;
@@ -739,15 +769,22 @@ template {
     padding-top: 8px;
 }
 
-.pagination > div.pagination-backward > div {
+.top-action {
+    display: flex;
+    justify-items: flex-end;
+    margin-bottom: 8px;
+}
+
+.pagination>div.pagination-backward>div {
     padding-right: 15px;
 }
 
-.pagination > div.pagination-forward > div {
+.pagination>div.pagination-forward>div {
     padding-left: 15px;
 }
 
-.pagination-next, .pagination-last {
+.pagination-next,
+.pagination-last {
     text-align: right;
 }
 
@@ -866,7 +903,7 @@ template {
     margin-right: 0;
 }
 
-.item-meta-icons li > :is(a, button) {
+.item-meta-icons li> :is(a, button) {
     color: #777;
     text-decoration: none;
     font-size: 0.8rem;
@@ -1049,7 +1086,12 @@ article.category-has-unread {
     overflow-wrap: break-word;
 }
 
-.entry-content h1, h2, h3, h4, h5, h6 {
+.entry-content h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     margin-top: 15px;
     margin-bottom: 10px;
 }
@@ -1271,37 +1313,38 @@ details.entry-enclosures {
     opacity: 20%;
 }
 
-audio, video {
+audio,
+video {
     width: 100%;
 }
 
-.media-controls{
+.media-controls {
     font-size: .9em;
     display: flex;
     flex-wrap: wrap;
 }
 
-.media-controls .media-control-label{
+.media-controls .media-control-label {
     line-height: 1em;
 }
 
-.media-controls>div{
+.media-controls>div {
     display: flex;
     flex-wrap: nowrap;
-    justify-content:center;
+    justify-content: center;
     min-width: 50%;
     align-items: center;
 }
 
-.media-controls>div>*{
-    padding-left:12px;
+.media-controls>div>* {
+    padding-left: 12px;
 }
 
-.media-controls>div>*:first-child{
-    padding-left:0;
+.media-controls>div>*:first-child {
+    padding-left: 0;
 }
 
-.media-controls span.speed-indicator{
+.media-controls span.speed-indicator {
     /*monospace to ensure constant width even when value change. JS ensure the value is always on 4 characters (in most cases)
     This reduce ui flickering due to element moving around a bit
     */
