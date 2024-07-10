@@ -732,6 +732,12 @@ template {
     padding-top: 8px;
 }
 
+.top-action {
+    display: flex; 
+    justify-items: flex-end;
+    margin-bottom: 8px;
+}
+
 .pagination > div {
     display: flex;
 }
