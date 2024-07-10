@@ -31,7 +31,7 @@ func (s *Storage) HasDuplicateGoogleReaderUsername(userID int64, googleReaderUse
 func (s *Storage) UserByFeverToken(token string) (*model.User, error) {
 	query := `
 		SELECT
-			users.id, users.is_admin, users.timezone
+			users.id, users.username, users.is_admin, users.timezone
 		FROM
 			users
 		LEFT JOIN
@@ -41,7 +41,7 @@ func (s *Storage) UserByFeverToken(token string) (*model.User, error) {
 	`
 
 	var user model.User
-	err := s.db.QueryRow(query, token).Scan(&user.ID, &user.IsAdmin, &user.Timezone)
+	err := s.db.QueryRow(query, token).Scan(&user.ID, &user.Username, &user.IsAdmin, &user.Timezone)
 	switch {
 	case err == sql.ErrNoRows:
 		return nil, nil
@@ -148,11 +148,24 @@ func (s *Storage) Integration(userID int64) (*model.Integration, error) {
 			telegram_bot_enabled,
 			telegram_bot_token,
 			telegram_bot_chat_id,
+			telegram_bot_topic_id,
+			telegram_bot_disable_web_page_preview,
+			telegram_bot_disable_notification,
+			telegram_bot_disable_buttons,
+			linkace_enabled,
+			linkace_url,
+			linkace_api_key,
+			linkace_tags,
+			linkace_is_private,
+			linkace_check_disabled,
 			linkding_enabled,
 			linkding_url,
 			linkding_api_key,
 			linkding_tags,
 			linkding_mark_as_unread,
+			linkwarden_enabled,
+			linkwarden_url,
+			linkwarden_api_key,
 			matrix_bot_enabled,
 			matrix_bot_user,
 			matrix_bot_password,
@@ -161,13 +174,33 @@ func (s *Storage) Integration(userID int64) (*model.Integration, error) {
 			apprise_enabled,
 			apprise_url,
 			apprise_services_url,
+			readeck_enabled,
+			readeck_url,
+			readeck_api_key,
+			readeck_labels,
+			readeck_only_url,
 			shiori_enabled,
 			shiori_url,
 			shiori_username,
 			shiori_password,
 			shaarli_enabled,
 			shaarli_url,
-			shaarli_api_secret
+			shaarli_api_secret,
+			webhook_enabled,
+			webhook_url,
+			webhook_secret,
+			rssbridge_enabled,
+			rssbridge_url,
+			omnivore_enabled,
+			omnivore_api_key,
+			omnivore_url,
+			raindrop_enabled,
+			raindrop_token,
+			raindrop_collection_id,
+			raindrop_tags,
+			betula_enabled,
+			betula_url,
+			betula_token
 		FROM
 			integrations
 		WHERE
@@ -214,11 +247,24 @@ func (s *Storage) Integration(userID int64) (*model.Integration, error) {
 		&integration.TelegramBotEnabled,
 		&integration.TelegramBotToken,
 		&integration.TelegramBotChatID,
+		&integration.TelegramBotTopicID,
+		&integration.TelegramBotDisableWebPagePreview,
+		&integration.TelegramBotDisableNotification,
+		&integration.TelegramBotDisableButtons,
+		&integration.LinkAceEnabled,
+		&integration.LinkAceURL,
+		&integration.LinkAceAPIKey,
+		&integration.LinkAceTags,
+		&integration.LinkAcePrivate,
+		&integration.LinkAceCheckDisabled,
 		&integration.LinkdingEnabled,
 		&integration.LinkdingURL,
 		&integration.LinkdingAPIKey,
 		&integration.LinkdingTags,
 		&integration.LinkdingMarkAsUnread,
+		&integration.LinkwardenEnabled,
+		&integration.LinkwardenURL,
+		&integration.LinkwardenAPIKey,
 		&integration.MatrixBotEnabled,
 		&integration.MatrixBotUser,
 		&integration.MatrixBotPassword,
@@ -227,6 +273,11 @@ func (s *Storage) Integration(userID int64) (*model.Integration, error) {
 		&integration.AppriseEnabled,
 		&integration.AppriseURL,
 		&integration.AppriseServicesURL,
+		&integration.ReadeckEnabled,
+		&integration.ReadeckURL,
+		&integration.ReadeckAPIKey,
+		&integration.ReadeckLabels,
+		&integration.ReadeckOnlyURL,
 		&integration.ShioriEnabled,
 		&integration.ShioriURL,
 		&integration.ShioriUsername,
@@ -234,6 +285,21 @@ func (s *Storage) Integration(userID int64) (*model.Integration, error) {
 		&integration.ShaarliEnabled,
 		&integration.ShaarliURL,
 		&integration.ShaarliAPISecret,
+		&integration.WebhookEnabled,
+		&integration.WebhookURL,
+		&integration.WebhookSecret,
+		&integration.RSSBridgeEnabled,
+		&integration.RSSBridgeURL,
+		&integration.OmnivoreEnabled,
+		&integration.OmnivoreAPIKey,
+		&integration.OmnivoreURL,
+		&integration.RaindropEnabled,
+		&integration.RaindropToken,
+		&integration.RaindropCollectionID,
+		&integration.RaindropTags,
+		&integration.BetulaEnabled,
+		&integration.BetulaURL,
+		&integration.BetulaToken,
 	)
 	switch {
 	case err == sql.ErrNoRows:
@@ -280,37 +346,70 @@ func (s *Storage) UpdateIntegration(integration *model.Integration) error {
 			telegram_bot_enabled=$27,
 			telegram_bot_token=$28,
 			telegram_bot_chat_id=$29,
-			espial_enabled=$30,
-			espial_url=$31,
-			espial_api_key=$32,
-			espial_tags=$33,
-			linkding_enabled=$34,
-			linkding_url=$35,
-			linkding_api_key=$36,
-			linkding_tags=$37,
-			linkding_mark_as_unread=$38,
-			matrix_bot_enabled=$39,
-			matrix_bot_user=$40,
-			matrix_bot_password=$41,
-			matrix_bot_url=$42,
-			matrix_bot_chat_id=$43,
-			notion_enabled=$44,
-			notion_token=$45,
-			notion_page_id=$46,
-			readwise_enabled=$47,
-			readwise_api_key=$48,
-			apprise_enabled=$49,
-			apprise_url=$50,
-			apprise_services_url=$51,
-			shiori_enabled=$52,
-			shiori_url=$53,
-			shiori_username=$54,
-			shiori_password=$55,
-			shaarli_enabled=$56,
-			shaarli_url=$57,
-			shaarli_api_secret=$58
+			telegram_bot_topic_id=$30,
+			telegram_bot_disable_web_page_preview=$31,
+			telegram_bot_disable_notification=$32,
+			telegram_bot_disable_buttons=$33,
+			espial_enabled=$34,
+			espial_url=$35,
+			espial_api_key=$36,
+			espial_tags=$37,
+			linkace_enabled=$38,
+			linkace_url=$39,
+			linkace_api_key=$40,
+			linkace_tags=$41,
+			linkace_is_private=$42,
+			linkace_check_disabled=$43,
+			linkding_enabled=$44,
+			linkding_url=$45,
+			linkding_api_key=$46,
+			linkding_tags=$47,
+			linkding_mark_as_unread=$48,
+			matrix_bot_enabled=$49,
+			matrix_bot_user=$50,
+			matrix_bot_password=$51,
+			matrix_bot_url=$52,
+			matrix_bot_chat_id=$53,
+			notion_enabled=$54,
+			notion_token=$55,
+			notion_page_id=$56,
+			readwise_enabled=$57,
+			readwise_api_key=$58,
+			apprise_enabled=$59,
+			apprise_url=$60,
+			apprise_services_url=$61,
+			readeck_enabled=$62,
+			readeck_url=$63,
+			readeck_api_key=$64,
+			readeck_labels=$65,
+			readeck_only_url=$66,
+			shiori_enabled=$67,
+			shiori_url=$68,
+			shiori_username=$69,
+			shiori_password=$70,
+			shaarli_enabled=$71,
+			shaarli_url=$72,
+			shaarli_api_secret=$73,
+			webhook_enabled=$74,
+			webhook_url=$75,
+			webhook_secret=$76,
+			rssbridge_enabled=$77,
+			rssbridge_url=$78,
+			omnivore_enabled=$79,
+			omnivore_api_key=$80,
+			omnivore_url=$81,
+			linkwarden_enabled=$82,
+			linkwarden_url=$83,
+			linkwarden_api_key=$84,
+			raindrop_enabled=$85,
+			raindrop_token=$86,
+			raindrop_collection_id=$87,
+			raindrop_tags=$88,
+			betula_enabled=$89,
+			betula_url=$90,
+			betula_token=$91
 		WHERE
-			user_id=$59
+			user_id=$92
 	`
 	_, err := s.db.Exec(
 		query,
@@ -343,10 +442,20 @@ func (s *Storage) UpdateIntegration(integration *model.Integration) error {
 		integration.TelegramBotEnabled,
 		integration.TelegramBotToken,
 		integration.TelegramBotChatID,
+		integration.TelegramBotTopicID,
+		integration.TelegramBotDisableWebPagePreview,
+		integration.TelegramBotDisableNotification,
+		integration.TelegramBotDisableButtons,
 		integration.EspialEnabled,
 		integration.EspialURL,
 		integration.EspialAPIKey,
 		integration.EspialTags,
+		integration.LinkAceEnabled,
+		integration.LinkAceURL,
+		integration.LinkAceAPIKey,
+		integration.LinkAceTags,
+		integration.LinkAcePrivate,
+		integration.LinkAceCheckDisabled,
 		integration.LinkdingEnabled,
 		integration.LinkdingURL,
 		integration.LinkdingAPIKey,
@@ -365,6 +474,11 @@ func (s *Storage) UpdateIntegration(integration *model.Integration) error {
 		integration.AppriseEnabled,
 		integration.AppriseURL,
 		integration.AppriseServicesURL,
+		integration.ReadeckEnabled,
+		integration.ReadeckURL,
+		integration.ReadeckAPIKey,
+		integration.ReadeckLabels,
+		integration.ReadeckOnlyURL,
 		integration.ShioriEnabled,
 		integration.ShioriURL,
 		integration.ShioriUsername,
@@ -372,6 +486,24 @@ func (s *Storage) UpdateIntegration(integration *model.Integration) error {
 		integration.ShaarliEnabled,
 		integration.ShaarliURL,
 		integration.ShaarliAPISecret,
+		integration.WebhookEnabled,
+		integration.WebhookURL,
+		integration.WebhookSecret,
+		integration.RSSBridgeEnabled,
+		integration.RSSBridgeURL,
+		integration.OmnivoreEnabled,
+		integration.OmnivoreAPIKey,
+		integration.OmnivoreURL,
+		integration.LinkwardenEnabled,
+		integration.LinkwardenURL,
+		integration.LinkwardenAPIKey,
+		integration.RaindropEnabled,
+		integration.RaindropToken,
+		integration.RaindropCollectionID,
+		integration.RaindropTags,
+		integration.BetulaEnabled,
+		integration.BetulaURL,
+		integration.BetulaToken,
 		integration.UserID,
 	)
 
@@ -401,10 +533,17 @@ func (s *Storage) HasSaveEntry(userID int64) (result bool) {
 				espial_enabled='t' OR
 				readwise_enabled='t' OR
 				pocket_enabled='t' OR
+				linkace_enabled='t' OR
 				linkding_enabled='t' OR
+				linkwarden_enabled='t' OR
 				apprise_enabled='t' OR
 				shiori_enabled='t' OR
-				shaarli_enabled='t'
+				readeck_enabled='t' OR
+				shaarli_enabled='t' OR
+				webhook_enabled='t' OR
+				omnivore_enabled='t' OR
+				raindrop_enabled='t' OR
+				betula_enabled='t'
 			)
 	`
 	if err := s.db.QueryRow(query, userID).Scan(&result); err != nil {

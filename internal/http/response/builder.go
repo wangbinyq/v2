@@ -8,11 +8,12 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"miniflux.app/v2/internal/logger"
+	"github.com/andybalholm/brotli"
 )
 
 const compressionThreshold = 1024
@@ -61,7 +62,7 @@ func (b *Builder) WithoutCompression() *Builder {
 func (b *Builder) WithCaching(etag string, duration time.Duration, callback func(*Builder)) {
 	b.headers["ETag"] = etag
 	b.headers["Cache-Control"] = "public"
-	b.headers["Expires"] = time.Now().Add(duration).Format(time.RFC1123)
+	b.headers["Expires"] = time.Now().Add(duration).UTC().Format(http.TimeFormat)
 
 	if etag == b.r.Header.Get("If-None-Match") {
 		b.statusCode = http.StatusNotModified
@@ -91,13 +92,12 @@ func (b *Builder) Write() {
 		b.writeHeaders()
 		_, err := io.Copy(b.w, v)
 		if err != nil {
-			logger.Error("%v", err)
+			slog.Error("Unable to write response body", slog.Any("error", err))
 		}
 	}
 }
 
 func (b *Builder) writeHeaders() {
-	b.headers["X-XSS-Protection"] = "1; mode=block"
 	b.headers["X-Content-Type-Options"] = "nosniff"
 	b.headers["X-Frame-Options"] = "DENY"
 	b.headers["Referrer-Policy"] = "no-referrer"
@@ -112,8 +112,15 @@ func (b *Builder) writeHeaders() {
 func (b *Builder) compress(data []byte) {
 	if b.enableCompression && len(data) > compressionThreshold {
 		acceptEncoding := b.r.Header.Get("Accept-Encoding")
-
 		switch {
+		case strings.Contains(acceptEncoding, "br"):
+			b.headers["Content-Encoding"] = "br"
+			b.writeHeaders()
+
+			brotliWriter := brotli.NewWriterV2(b.w, brotli.DefaultCompression)
+			defer brotliWriter.Close()
+			brotliWriter.Write(data)
+			return
 		case strings.Contains(acceptEncoding, "gzip"):
 			b.headers["Content-Encoding"] = "gzip"
 			b.writeHeaders()

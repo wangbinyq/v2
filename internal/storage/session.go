@@ -53,12 +53,29 @@ func (s *Storage) createAppSession(session *model.Session) (*model.Session, erro
 }
 
 // UpdateAppSessionField updates only one session field.
-func (s *Storage) UpdateAppSessionField(sessionID, field string, value interface{}) error {
+func (s *Storage) UpdateAppSessionField(sessionID, field string, value any) error {
 	query := `
 		UPDATE
 			sessions
 		SET
 			data = jsonb_set(data, '{%s}', to_jsonb($1::text), true)
+		WHERE
+			id=$2
+	`
+	_, err := s.db.Exec(fmt.Sprintf(query, field), value, sessionID)
+	if err != nil {
+		return fmt.Errorf(`store: unable to update session field: %v`, err)
+	}
+
+	return nil
+}
+
+func (s *Storage) UpdateAppSessionObjectField(sessionID, field string, value interface{}) error {
+	query := `
+		UPDATE
+			sessions
+		SET
+			data = jsonb_set(data, '{%s}', $1, true)
 		WHERE
 			id=$2
 	`
@@ -111,9 +128,9 @@ func (s *Storage) CleanOldSessions(days int) int64 {
 		DELETE FROM
 			sessions
 		WHERE
-			id IN (SELECT id FROM sessions WHERE created_at < now() - interval '%d days')
+			created_at < now() - $1::interval
 	`
-	result, err := s.db.Exec(fmt.Sprintf(query, days))
+	result, err := s.db.Exec(query, fmt.Sprintf("%d days", days))
 	if err != nil {
 		return 0
 	}

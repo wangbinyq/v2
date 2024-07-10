@@ -6,11 +6,11 @@ package storage // import "miniflux.app/v2/internal/storage"
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"strings"
 
 	"miniflux.app/v2/internal/crypto"
-	"miniflux.app/v2/internal/logger"
 	"miniflux.app/v2/internal/model"
 
 	"github.com/lib/pq"
@@ -91,7 +91,10 @@ func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*m
 			cjk_reading_speed,
 			default_home_page,
 			categories_sorting_order,
-			mark_read_on_view
+			mark_read_on_view,
+			media_playback_rate,
+			block_filter_entry_rules,
+			keep_filter_entry_rules
 	`
 
 	tx, err := s.db.Begin()
@@ -130,6 +133,9 @@ func (s *Storage) CreateUser(userCreationRequest *model.UserCreationRequest) (*m
 		&user.DefaultHomePage,
 		&user.CategoriesSortingOrder,
 		&user.MarkReadOnView,
+		&user.MediaPlaybackRate,
+		&user.BlockFilterEntryRules,
+		&user.KeepFilterEntryRules,
 	)
 	if err != nil {
 		tx.Rollback()
@@ -186,9 +192,12 @@ func (s *Storage) UpdateUser(user *model.User) error {
 				cjk_reading_speed=$19,
 				default_home_page=$20,
 				categories_sorting_order=$21,
-				mark_read_on_view=$22
+				mark_read_on_view=$22,
+				media_playback_rate=$23,
+				block_filter_entry_rules=$24,
+				keep_filter_entry_rules=$25
 			WHERE
-				id=$23
+				id=$26
 		`
 
 		_, err = s.db.Exec(
@@ -215,6 +224,9 @@ func (s *Storage) UpdateUser(user *model.User) error {
 			user.DefaultHomePage,
 			user.CategoriesSortingOrder,
 			user.MarkReadOnView,
+			user.MediaPlaybackRate,
+			user.BlockFilterEntryRules,
+			user.KeepFilterEntryRules,
 			user.ID,
 		)
 		if err != nil {
@@ -243,9 +255,12 @@ func (s *Storage) UpdateUser(user *model.User) error {
 				cjk_reading_speed=$18,
 				default_home_page=$19,
 				categories_sorting_order=$20,
-				mark_read_on_view=$21
+				mark_read_on_view=$21,
+				media_playback_rate=$22,
+				block_filter_entry_rules=$23,
+				keep_filter_entry_rules=$24
 			WHERE
-				id=$22
+				id=$25
 		`
 
 		_, err := s.db.Exec(
@@ -271,6 +286,9 @@ func (s *Storage) UpdateUser(user *model.User) error {
 			user.DefaultHomePage,
 			user.CategoriesSortingOrder,
 			user.MarkReadOnView,
+			user.MediaPlaybackRate,
+			user.BlockFilterEntryRules,
+			user.KeepFilterEntryRules,
 			user.ID,
 		)
 
@@ -318,7 +336,10 @@ func (s *Storage) UserByID(userID int64) (*model.User, error) {
 			cjk_reading_speed,
 			default_home_page,
 			categories_sorting_order,
-			mark_read_on_view
+			mark_read_on_view,
+			media_playback_rate,
+			block_filter_entry_rules,
+			keep_filter_entry_rules
 		FROM
 			users
 		WHERE
@@ -353,7 +374,10 @@ func (s *Storage) UserByUsername(username string) (*model.User, error) {
 			cjk_reading_speed,
 			default_home_page,
 			categories_sorting_order,
-			mark_read_on_view
+			mark_read_on_view,
+			media_playback_rate,
+			block_filter_entry_rules,
+			keep_filter_entry_rules
 		FROM
 			users
 		WHERE
@@ -388,7 +412,10 @@ func (s *Storage) UserByField(field, value string) (*model.User, error) {
 			cjk_reading_speed,
 			default_home_page,
 			categories_sorting_order,
-			mark_read_on_view
+			mark_read_on_view,
+			media_playback_rate,
+			block_filter_entry_rules,
+			keep_filter_entry_rules
 		FROM
 			users
 		WHERE
@@ -430,7 +457,10 @@ func (s *Storage) UserByAPIKey(token string) (*model.User, error) {
 			u.cjk_reading_speed,
 			u.default_home_page,
 			u.categories_sorting_order,
-			u.mark_read_on_view
+			u.mark_read_on_view,
+			media_playback_rate,
+			u.block_filter_entry_rules,
+			u.keep_filter_entry_rules
 		FROM
 			users u
 		LEFT JOIN
@@ -467,6 +497,9 @@ func (s *Storage) fetchUser(query string, args ...interface{}) (*model.User, err
 		&user.DefaultHomePage,
 		&user.CategoriesSortingOrder,
 		&user.MarkReadOnView,
+		&user.MediaPlaybackRate,
+		&user.BlockFilterEntryRules,
+		&user.KeepFilterEntryRules,
 	)
 
 	if err == sql.ErrNoRows {
@@ -506,14 +539,20 @@ func (s *Storage) RemoveUser(userID int64) error {
 func (s *Storage) RemoveUserAsync(userID int64) {
 	go func() {
 		if err := s.deleteUserFeeds(userID); err != nil {
-			logger.Error(`%v`, err)
+			slog.Error("Unable to delete user feeds",
+				slog.Int64("user_id", userID),
+				slog.Any("error", err),
+			)
 			return
 		}
 
 		s.db.Exec(`DELETE FROM users WHERE id=$1`, userID)
 		s.db.Exec(`DELETE FROM integrations WHERE user_id=$1`, userID)
 
-		logger.Debug(`[MASS DELETE] User #%d has been deleted (%d GoRoutines)`, userID, runtime.NumGoroutine())
+		slog.Debug("User deleted",
+			slog.Int64("user_id", userID),
+			slog.Int("goroutines", runtime.NumGoroutine()),
+		)
 	}()
 }
 
@@ -528,7 +567,11 @@ func (s *Storage) deleteUserFeeds(userID int64) error {
 		var feedID int64
 		rows.Scan(&feedID)
 
-		logger.Debug(`[USER DELETION] Deleting feed #%d for user #%d (%d GoRoutines)`, feedID, userID, runtime.NumGoroutine())
+		slog.Debug("Deleting feed",
+			slog.Int64("user_id", userID),
+			slog.Int64("feed_id", feedID),
+			slog.Int("goroutines", runtime.NumGoroutine()),
+		)
 
 		if err := s.RemoveFeed(userID, feedID); err != nil {
 			return err
@@ -564,7 +607,10 @@ func (s *Storage) Users() (model.Users, error) {
 			cjk_reading_speed,
 			default_home_page,
 			categories_sorting_order,
-			mark_read_on_view
+			mark_read_on_view,
+			media_playback_rate,
+			block_filter_entry_rules,
+			keep_filter_entry_rules
 		FROM
 			users
 		ORDER BY username ASC
@@ -602,6 +648,9 @@ func (s *Storage) Users() (model.Users, error) {
 			&user.DefaultHomePage,
 			&user.CategoriesSortingOrder,
 			&user.MarkReadOnView,
+			&user.MediaPlaybackRate,
+			&user.BlockFilterEntryRules,
+			&user.KeepFilterEntryRules,
 		)
 
 		if err != nil {

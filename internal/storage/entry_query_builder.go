@@ -23,6 +23,13 @@ type EntryQueryBuilder struct {
 	sortExpressions []string
 	limit           int
 	offset          int
+	fetchEnclosures bool
+}
+
+// WithEnclosures fetches enclosures for each entry.
+func (e *EntryQueryBuilder) WithEnclosures() *EntryQueryBuilder {
+	e.fetchEnclosures = true
+	return e
 }
 
 // WithSearchQuery adds full-text search query to the condition.
@@ -51,15 +58,29 @@ func (e *EntryQueryBuilder) WithStarred(starred bool) *EntryQueryBuilder {
 	return e
 }
 
-// BeforeDate adds a condition < published_at
-func (e *EntryQueryBuilder) BeforeDate(date time.Time) *EntryQueryBuilder {
+// BeforeChangedDate adds a condition < changed_at
+func (e *EntryQueryBuilder) BeforeChangedDate(date time.Time) *EntryQueryBuilder {
+	e.conditions = append(e.conditions, fmt.Sprintf("e.changed_at < $%d", len(e.args)+1))
+	e.args = append(e.args, date)
+	return e
+}
+
+// AfterChangedDate adds a condition > changed_at
+func (e *EntryQueryBuilder) AfterChangedDate(date time.Time) *EntryQueryBuilder {
+	e.conditions = append(e.conditions, fmt.Sprintf("e.changed_at > $%d", len(e.args)+1))
+	e.args = append(e.args, date)
+	return e
+}
+
+// BeforePublishedDate adds a condition < published_at
+func (e *EntryQueryBuilder) BeforePublishedDate(date time.Time) *EntryQueryBuilder {
 	e.conditions = append(e.conditions, fmt.Sprintf("e.published_at < $%d", len(e.args)+1))
 	e.args = append(e.args, date)
 	return e
 }
 
-// AfterDate adds a condition > published_at
-func (e *EntryQueryBuilder) AfterDate(date time.Time) *EntryQueryBuilder {
+// AfterPublishedDate adds a condition > published_at
+func (e *EntryQueryBuilder) AfterPublishedDate(date time.Time) *EntryQueryBuilder {
 	e.conditions = append(e.conditions, fmt.Sprintf("e.published_at > $%d", len(e.args)+1))
 	e.args = append(e.args, date)
 	return e
@@ -139,7 +160,7 @@ func (e *EntryQueryBuilder) WithStatuses(statuses []string) *EntryQueryBuilder {
 func (e *EntryQueryBuilder) WithTags(tags []string) *EntryQueryBuilder {
 	if len(tags) > 0 {
 		for _, cat := range tags {
-			e.conditions = append(e.conditions, fmt.Sprintf("$%d = ANY(e.tags)", len(e.args)+1))
+			e.conditions = append(e.conditions, fmt.Sprintf("LOWER($%d) = ANY(LOWER(e.tags::text)::text[])", len(e.args)+1))
 			e.args = append(e.args, cat)
 		}
 	}
@@ -191,8 +212,8 @@ func (e *EntryQueryBuilder) WithOffset(offset int) *EntryQueryBuilder {
 }
 
 func (e *EntryQueryBuilder) WithGloballyVisible() *EntryQueryBuilder {
-	e.conditions = append(e.conditions, "not c.hide_globally")
-	e.conditions = append(e.conditions, "not f.hide_globally")
+	e.conditions = append(e.conditions, "c.hide_globally IS FALSE")
+	e.conditions = append(e.conditions, "f.hide_globally IS FALSE")
 	return e
 }
 
@@ -209,7 +230,7 @@ func (e *EntryQueryBuilder) CountEntries() (count int, err error) {
 
 	err = e.store.db.QueryRow(fmt.Sprintf(query, condition), e.args...).Scan(&count)
 	if err != nil {
-		return 0, fmt.Errorf("unable to count entries: %v", err)
+		return 0, fmt.Errorf("store: unable to count entries: %v", err)
 	}
 
 	return count, nil
@@ -256,16 +277,21 @@ func (e *EntryQueryBuilder) GetEntries() (model.Entries, error) {
 			e.created_at,
 			e.changed_at,
 			e.tags,
+			(SELECT true FROM enclosures WHERE entry_id=e.id LIMIT 1) as has_enclosure,
 			f.title as feed_title,
 			f.feed_url,
 			f.site_url,
+			f.description,
 			f.checked_at,
-			f.category_id, c.title as category_title,
+			f.category_id,
+			c.title as category_title,
+			c.hide_globally as category_hidden,
 			f.scraper_rules,
 			f.rewrite_rules,
 			f.crawler,
 			f.user_agent,
 			f.cookie,
+			f.hide_globally,
 			f.no_media_player,
 			fi.icon_id,
 			u.timezone
@@ -288,19 +314,17 @@ func (e *EntryQueryBuilder) GetEntries() (model.Entries, error) {
 
 	rows, err := e.store.db.Query(query, e.args...)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get entries: %v", err)
+		return nil, fmt.Errorf("store: unable to get entries: %v", err)
 	}
 	defer rows.Close()
 
 	entries := make(model.Entries, 0)
 	for rows.Next() {
-		var entry model.Entry
 		var iconID sql.NullInt64
 		var tz string
+		var hasEnclosure sql.NullBool
 
-		entry.Feed = &model.Feed{}
-		entry.Feed.Category = &model.Category{}
-		entry.Feed.Icon = &model.FeedIcon{}
+		entry := model.NewEntry()
 
 		err := rows.Scan(
 			&entry.ID,
@@ -320,24 +344,35 @@ func (e *EntryQueryBuilder) GetEntries() (model.Entries, error) {
 			&entry.CreatedAt,
 			&entry.ChangedAt,
 			pq.Array(&entry.Tags),
+			&hasEnclosure,
 			&entry.Feed.Title,
 			&entry.Feed.FeedURL,
 			&entry.Feed.SiteURL,
+			&entry.Feed.Description,
 			&entry.Feed.CheckedAt,
 			&entry.Feed.Category.ID,
 			&entry.Feed.Category.Title,
+			&entry.Feed.Category.HideGlobally,
 			&entry.Feed.ScraperRules,
 			&entry.Feed.RewriteRules,
 			&entry.Feed.Crawler,
 			&entry.Feed.UserAgent,
 			&entry.Feed.Cookie,
+			&entry.Feed.HideGlobally,
 			&entry.Feed.NoMediaPlayer,
 			&iconID,
 			&tz,
 		)
 
 		if err != nil {
-			return nil, fmt.Errorf("unable to fetch entry row: %v", err)
+			return nil, fmt.Errorf("store: unable to fetch entry row: %v", err)
+		}
+
+		if hasEnclosure.Valid && hasEnclosure.Bool && e.fetchEnclosures {
+			entry.Enclosures, err = e.store.GetEnclosures(entry.ID)
+			if err != nil {
+				return nil, fmt.Errorf("store: unable to fetch enclosures for entry #%d: %w", entry.ID, err)
+			}
 		}
 
 		if iconID.Valid {
@@ -356,7 +391,7 @@ func (e *EntryQueryBuilder) GetEntries() (model.Entries, error) {
 		entry.Feed.UserID = entry.UserID
 		entry.Feed.Icon.FeedID = entry.FeedID
 		entry.Feed.Category.UserID = entry.UserID
-		entries = append(entries, &entry)
+		entries = append(entries, entry)
 	}
 
 	return entries, nil
@@ -364,14 +399,25 @@ func (e *EntryQueryBuilder) GetEntries() (model.Entries, error) {
 
 // GetEntryIDs returns a list of entry IDs that match the condition.
 func (e *EntryQueryBuilder) GetEntryIDs() ([]int64, error) {
-	query := `SELECT e.id FROM entries e LEFT JOIN feeds f ON f.id=e.feed_id WHERE %s %s`
+	query := `
+		SELECT
+			e.id
+		FROM 
+			entries e
+		LEFT JOIN
+			feeds f
+		ON
+			f.id=e.feed_id 
+		WHERE 
+			%s %s
+	`
 
 	condition := e.buildCondition()
 	query = fmt.Sprintf(query, condition, e.buildSorting())
 
 	rows, err := e.store.db.Query(query, e.args...)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get entries: %v", err)
+		return nil, fmt.Errorf("store: unable to get entries: %v", err)
 	}
 	defer rows.Close()
 
@@ -381,7 +427,7 @@ func (e *EntryQueryBuilder) GetEntryIDs() ([]int64, error) {
 
 		err := rows.Scan(&entryID)
 		if err != nil {
-			return nil, fmt.Errorf("unable to fetch entry row: %v", err)
+			return nil, fmt.Errorf("store: unable to fetch entry row: %v", err)
 		}
 
 		entryIDs = append(entryIDs, entryID)
@@ -395,21 +441,21 @@ func (e *EntryQueryBuilder) buildCondition() string {
 }
 
 func (e *EntryQueryBuilder) buildSorting() string {
-	var parts []string
+	var parts string
 
 	if len(e.sortExpressions) > 0 {
-		parts = append(parts, fmt.Sprintf(`ORDER BY %s`, strings.Join(e.sortExpressions, ", ")))
+		parts += fmt.Sprintf(" ORDER BY %s", strings.Join(e.sortExpressions, ", "))
 	}
 
 	if e.limit > 0 {
-		parts = append(parts, fmt.Sprintf(`LIMIT %d`, e.limit))
+		parts += fmt.Sprintf(" LIMIT %d", e.limit)
 	}
 
 	if e.offset > 0 {
-		parts = append(parts, fmt.Sprintf(`OFFSET %d`, e.offset))
+		parts += fmt.Sprintf(" OFFSET %d", e.offset)
 	}
 
-	return strings.Join(parts, " ")
+	return parts
 }
 
 // NewEntryQueryBuilder returns a new EntryQueryBuilder.

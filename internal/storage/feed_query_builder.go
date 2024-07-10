@@ -91,25 +91,25 @@ func (f *FeedQueryBuilder) buildCounterCondition() string {
 }
 
 func (f *FeedQueryBuilder) buildSorting() string {
-	var parts []string
+	var parts string
 
 	if len(f.sortExpressions) > 0 {
-		parts = append(parts, fmt.Sprintf(`ORDER BY %s`, strings.Join(f.sortExpressions, ", ")))
+		parts += fmt.Sprintf(" ORDER BY %s", strings.Join(f.sortExpressions, ", "))
 	}
 
 	if len(parts) > 0 {
-		parts = append(parts, ", lower(f.title) ASC")
+		parts += ", lower(f.title) ASC"
 	}
 
 	if f.limit > 0 {
-		parts = append(parts, fmt.Sprintf(`LIMIT %d`, f.limit))
+		parts += fmt.Sprintf(" LIMIT %d", f.limit)
 	}
 
 	if f.offset > 0 {
-		parts = append(parts, fmt.Sprintf(`OFFSET %d`, f.offset))
+		parts += fmt.Sprintf(" OFFSET %d", f.offset)
 	}
 
-	return strings.Join(parts, " ")
+	return parts
 }
 
 // GetFeed returns a single feed that match the condition.
@@ -135,10 +135,12 @@ func (f *FeedQueryBuilder) GetFeeds() (model.Feeds, error) {
 			f.feed_url,
 			f.site_url,
 			f.title,
+			f.description,
 			f.etag_header,
 			f.last_modified_header,
 			f.user_id,
 			f.checked_at at time zone u.timezone,
+			f.next_check_at at time zone u.timezone,
 			f.parsing_error_count,
 			f.parsing_error_msg,
 			f.scraper_rules,
@@ -161,7 +163,9 @@ func (f *FeedQueryBuilder) GetFeeds() (model.Feeds, error) {
 			c.title as category_title,
 			c.hide_globally as category_hidden,
 			fi.icon_id,
-			u.timezone
+			u.timezone,
+			f.apprise_service_urls,
+			f.disable_http2
 		FROM
 			feeds f
 		LEFT JOIN
@@ -170,7 +174,7 @@ func (f *FeedQueryBuilder) GetFeeds() (model.Feeds, error) {
 			feed_icons fi ON fi.feed_id=f.id
 		LEFT JOIN
 			users u ON u.id=f.user_id
-		WHERE %s 
+		WHERE %s
 		%s
 	`
 
@@ -199,10 +203,12 @@ func (f *FeedQueryBuilder) GetFeeds() (model.Feeds, error) {
 			&feed.FeedURL,
 			&feed.SiteURL,
 			&feed.Title,
+			&feed.Description,
 			&feed.EtagHeader,
 			&feed.LastModifiedHeader,
 			&feed.UserID,
 			&feed.CheckedAt,
+			&feed.NextCheckAt,
 			&feed.ParsingErrorCount,
 			&feed.ParsingErrorMsg,
 			&feed.ScraperRules,
@@ -226,6 +232,8 @@ func (f *FeedQueryBuilder) GetFeeds() (model.Feeds, error) {
 			&feed.Category.HideGlobally,
 			&iconID,
 			&tz,
+			&feed.AppriseServiceURLs,
+			&feed.DisableHTTP2,
 		)
 
 		if err != nil {
@@ -249,7 +257,9 @@ func (f *FeedQueryBuilder) GetFeeds() (model.Feeds, error) {
 			}
 		}
 
+		feed.NumberOfVisibleEntries = feed.ReadCount + feed.UnreadCount
 		feed.CheckedAt = timezone.Convert(tz, feed.CheckedAt)
+		feed.NextCheckAt = timezone.Convert(tz, feed.NextCheckAt)
 		feed.Category.UserID = feed.UserID
 		feeds = append(feeds, &feed)
 	}
@@ -268,9 +278,9 @@ func (f *FeedQueryBuilder) fetchFeedCounter() (unreadCounters map[int64]int, rea
 			count(*)
 		FROM
 			entries e
-		%s 
+		%s
 		WHERE
-			%s 
+			%s
 		GROUP BY
 			e.feed_id, e.status
 	`

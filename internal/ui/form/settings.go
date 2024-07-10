@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"miniflux.app/v2/internal/errors"
+	"miniflux.app/v2/internal/locale"
 	"miniflux.app/v2/internal/model"
 )
 
@@ -33,6 +33,9 @@ type SettingsForm struct {
 	DefaultHomePage        string
 	CategoriesSortingOrder string
 	MarkReadOnView         bool
+	MediaPlaybackRate      float64
+	BlockFilterEntryRules  string
+	KeepFilterEntryRules   string
 }
 
 // Merge updates the fields of the given user.
@@ -55,6 +58,9 @@ func (s *SettingsForm) Merge(user *model.User) *model.User {
 	user.DefaultHomePage = s.DefaultHomePage
 	user.CategoriesSortingOrder = s.CategoriesSortingOrder
 	user.MarkReadOnView = s.MarkReadOnView
+	user.MediaPlaybackRate = s.MediaPlaybackRate
+	user.BlockFilterEntryRules = s.BlockFilterEntryRules
+	user.KeepFilterEntryRules = s.KeepFilterEntryRules
 
 	if s.Password != "" {
 		user.Password = s.Password
@@ -64,13 +70,13 @@ func (s *SettingsForm) Merge(user *model.User) *model.User {
 }
 
 // Validate makes sure the form values are valid.
-func (s *SettingsForm) Validate() error {
+func (s *SettingsForm) Validate() *locale.LocalizedError {
 	if s.Username == "" || s.Theme == "" || s.Language == "" || s.Timezone == "" || s.EntryDirection == "" || s.DisplayMode == "" || s.DefaultHomePage == "" {
-		return errors.NewLocalizedError("error.settings_mandatory_fields")
+		return locale.NewLocalizedError("error.settings_mandatory_fields")
 	}
 
 	if s.CJKReadingSpeed <= 0 || s.DefaultReadingSpeed <= 0 {
-		return errors.NewLocalizedError("error.settings_reading_speed_is_positive")
+		return locale.NewLocalizedError("error.settings_reading_speed_is_positive")
 	}
 
 	if s.Confirmation == "" {
@@ -80,8 +86,12 @@ func (s *SettingsForm) Validate() error {
 		s.Password = ""
 	} else if s.Password != "" {
 		if s.Password != s.Confirmation {
-			return errors.NewLocalizedError("error.different_passwords")
+			return locale.NewLocalizedError("error.different_passwords")
 		}
+	}
+
+	if s.MediaPlaybackRate < 0.25 || s.MediaPlaybackRate > 4 {
+		return locale.NewLocalizedError("error.settings_media_playback_rate_range")
 	}
 
 	return nil
@@ -100,6 +110,10 @@ func NewSettingsForm(r *http.Request) *SettingsForm {
 	cjkReadingSpeed, err := strconv.ParseInt(r.FormValue("cjk_reading_speed"), 10, 0)
 	if err != nil {
 		cjkReadingSpeed = 0
+	}
+	mediaPlaybackRate, err := strconv.ParseFloat(r.FormValue("media_playback_rate"), 64)
+	if err != nil {
+		mediaPlaybackRate = 1
 	}
 	return &SettingsForm{
 		Username:               r.FormValue("username"),
@@ -122,5 +136,8 @@ func NewSettingsForm(r *http.Request) *SettingsForm {
 		DefaultHomePage:        r.FormValue("default_home_page"),
 		CategoriesSortingOrder: r.FormValue("categories_sorting_order"),
 		MarkReadOnView:         r.FormValue("mark_read_on_view") == "1",
+		MediaPlaybackRate:      mediaPlaybackRate,
+		BlockFilterEntryRules:  r.FormValue("block_filter_entry_rules"),
+		KeepFilterEntryRules:   r.FormValue("keep_filter_entry_rules"),
 	}
 }

@@ -752,4 +752,173 @@ var migrations = []func(tx *sql.Tx) error{
 		_, err = tx.Exec(sql)
 		return err
 	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			ALTER TABLE feeds ADD COLUMN apprise_service_urls text default '';
+		`)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN webhook_enabled bool default 'f';
+			ALTER TABLE integrations ADD COLUMN webhook_url text default '';
+			ALTER TABLE integrations ADD COLUMN webhook_secret text default '';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN telegram_bot_topic_id int;
+			ALTER TABLE integrations ADD COLUMN telegram_bot_disable_web_page_preview bool default 'f';
+			ALTER TABLE integrations ADD COLUMN telegram_bot_disable_notification bool default 'f';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN telegram_bot_disable_buttons bool default 'f';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			-- Speed up has_enclosure
+			CREATE INDEX enclosures_entry_id_idx ON enclosures(entry_id);
+
+			-- Speed up unread page
+			CREATE INDEX entries_user_status_published_idx ON entries(user_id, status, published_at);
+			CREATE INDEX entries_user_status_created_idx ON entries(user_id, status, created_at);
+			CREATE INDEX feeds_feed_id_hide_globally_idx ON feeds(id, hide_globally);
+
+			-- Speed up history page
+			CREATE INDEX entries_user_status_changed_published_idx ON entries(user_id, status, changed_at, published_at);
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN rssbridge_enabled bool default 'f';
+			ALTER TABLE integrations ADD COLUMN rssbridge_url text default '';
+		`
+		_, err = tx.Exec(sql)
+		return
+	},
+	func(tx *sql.Tx) (err error) {
+		_, err = tx.Exec(`
+			CREATE TABLE webauthn_credentials (
+				handle bytea primary key,
+				cred_id bytea unique not null,
+				user_id int references users(id) on delete cascade not null,
+				public_key bytea not null,
+				attestation_type varchar(255) not null,
+				aaguid bytea,
+				sign_count bigint,
+				clone_warning bool,
+				name text,
+				added_on timestamp with time zone default now(),
+				last_seen_on timestamp with time zone default now()
+			);
+		`)
+		return
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN omnivore_enabled bool default 'f';
+			ALTER TABLE integrations ADD COLUMN omnivore_api_key text default '';
+			ALTER TABLE integrations ADD COLUMN omnivore_url text default '';
+		`
+		_, err = tx.Exec(sql)
+		return
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN linkace_enabled bool default 'f';
+			ALTER TABLE integrations ADD COLUMN linkace_url text default '';
+			ALTER TABLE integrations ADD COLUMN linkace_api_key text default '';
+			ALTER TABLE integrations ADD COLUMN linkace_tags text default '';
+			ALTER TABLE integrations ADD COLUMN linkace_is_private bool default 't';
+			ALTER TABLE integrations ADD COLUMN linkace_check_disabled bool default 't';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN linkwarden_enabled bool default 'f';
+			ALTER TABLE integrations ADD COLUMN linkwarden_url text default '';
+			ALTER TABLE integrations ADD COLUMN linkwarden_api_key text default '';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN readeck_enabled bool default 'f';
+			ALTER TABLE integrations ADD COLUMN readeck_only_url bool default 'f';
+			ALTER TABLE integrations ADD COLUMN readeck_url text default '';
+			ALTER TABLE integrations ADD COLUMN readeck_api_key text default '';
+			ALTER TABLE integrations ADD COLUMN readeck_labels text default '';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `ALTER TABLE feeds ADD COLUMN disable_http2 bool default 'f'`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `ALTER TABLE users ADD COLUMN media_playback_rate numeric default 1;`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		// the WHERE part speed-up the request a lot
+		sql := `UPDATE entries SET tags = array_remove(tags, '') WHERE '' = ANY(tags);`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		// Entry URLs can exceeds btree maximum size
+		// Checking entry existence is now using entries_feed_id_status_hash_idx index
+		_, err = tx.Exec(`DROP INDEX entries_feed_url_idx`)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN raindrop_enabled bool default 'f';
+			ALTER TABLE integrations ADD COLUMN raindrop_token text default '';
+			ALTER TABLE integrations ADD COLUMN raindrop_collection_id text default '';
+			ALTER TABLE integrations ADD COLUMN raindrop_tags text default '';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `ALTER TABLE feeds ADD COLUMN description text default ''`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE users
+				ADD COLUMN block_filter_entry_rules text not null default '',
+				ADD COLUMN keep_filter_entry_rules text not null default ''
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE integrations ADD COLUMN betula_url text default '';
+			ALTER TABLE integrations ADD COLUMN betula_token text default '';
+			ALTER TABLE integrations ADD COLUMN betula_enabled bool default 'f';
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
 }

@@ -36,7 +36,7 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 	integrationForm.Merge(integration)
 
 	if integration.FeverUsername != "" && h.store.HasDuplicateFeverUsername(user.ID, integration.FeverUsername) {
-		sess.NewFlashErrorMessage(printer.Printf("error.duplicate_fever_username"))
+		sess.NewFlashErrorMessage(printer.Print("error.duplicate_fever_username"))
 		html.Redirect(w, r, route.Path(h.router, "integrations"))
 		return
 	}
@@ -50,7 +50,7 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if integration.GoogleReaderUsername != "" && h.store.HasDuplicateGoogleReaderUsername(user.ID, integration.GoogleReaderUsername) {
-		sess.NewFlashErrorMessage(printer.Printf("error.duplicate_googlereader_username"))
+		sess.NewFlashErrorMessage(printer.Print("error.duplicate_googlereader_username"))
 		html.Redirect(w, r, route.Path(h.router, "integrations"))
 		return
 	}
@@ -67,12 +67,24 @@ func (h *handler) updateIntegration(w http.ResponseWriter, r *http.Request) {
 		integration.GoogleReaderPassword = ""
 	}
 
+	if integrationForm.WebhookEnabled {
+		if integrationForm.WebhookURL == "" {
+			integration.WebhookEnabled = false
+			integration.WebhookSecret = ""
+		} else if integration.WebhookSecret == "" {
+			integration.WebhookSecret = crypto.GenerateRandomStringHex(32)
+		}
+	} else {
+		integration.WebhookURL = ""
+		integration.WebhookSecret = ""
+	}
+
 	err = h.store.UpdateIntegration(integration)
 	if err != nil {
 		html.ServerError(w, r, err)
 		return
 	}
 
-	sess.NewFlashMessage(printer.Printf("alert.prefs_saved"))
+	sess.NewFlashMessage(printer.Print("alert.prefs_saved"))
 	html.Redirect(w, r, route.Path(h.router, "integrations"))
 }

@@ -43,6 +43,7 @@ func (h *handler) showEditFeedPage(w http.ResponseWriter, r *http.Request) {
 		SiteURL:                     feed.SiteURL,
 		FeedURL:                     feed.FeedURL,
 		Title:                       feed.Title,
+		Description:                 feed.Description,
 		ScraperRules:                feed.ScraperRules,
 		RewriteRules:                feed.RewriteRules,
 		BlocklistRules:              feed.BlocklistRules,
@@ -61,6 +62,8 @@ func (h *handler) showEditFeedPage(w http.ResponseWriter, r *http.Request) {
 		NoMediaPlayer:               feed.NoMediaPlayer,
 		HideGlobally:                feed.HideGlobally,
 		CategoryHidden:              feed.Category.HideGlobally,
+		AppriseServiceURLs:          feed.AppriseServiceURLs,
+		DisableHTTP2:                feed.DisableHTTP2,
 	}
 
 	sess := session.New(h.store, request.SessionID(r))

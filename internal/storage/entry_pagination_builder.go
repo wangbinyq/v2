@@ -7,10 +7,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"miniflux.app/v2/internal/model"
-	"miniflux.app/v2/internal/timer"
 )
 
 // EntryPaginationBuilder is a builder for entry prev/next queries.
@@ -60,6 +58,15 @@ func (e *EntryPaginationBuilder) WithStatus(status string) {
 	}
 }
 
+func (e *EntryPaginationBuilder) WithTags(tags []string) {
+	if len(tags) > 0 {
+		for _, tag := range tags {
+			e.conditions = append(e.conditions, fmt.Sprintf("LOWER($%d) = ANY(LOWER(e.tags::text)::text[])", len(e.args)+1))
+			e.args = append(e.args, tag)
+		}
+	}
+}
+
 // WithGloballyVisible adds global visibility to the condition.
 func (e *EntryPaginationBuilder) WithGloballyVisible() {
 	e.conditions = append(e.conditions, "not c.hide_globally")
@@ -101,8 +108,6 @@ func (e *EntryPaginationBuilder) Entries() (*model.Entry, *model.Entry, error) {
 }
 
 func (e *EntryPaginationBuilder) getPrevNextID(tx *sql.Tx) (prevID int64, nextID int64, err error) {
-	defer timer.ExecutionTime(time.Now(), fmt.Sprintf("[EntryPaginationBuilder] %v, %v", e.conditions, e.args))
-
 	cte := `
 		WITH entry_pagination AS (
 			SELECT

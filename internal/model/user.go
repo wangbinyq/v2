@@ -35,6 +35,9 @@ type User struct {
 	DefaultHomePage        string     `json:"default_home_page"`
 	CategoriesSortingOrder string     `json:"categories_sorting_order"`
 	MarkReadOnView         bool       `json:"mark_read_on_view"`
+	MediaPlaybackRate      float64    `json:"media_playback_rate"`
+	BlockFilterEntryRules  string     `json:"block_filter_entry_rules"`
+	KeepFilterEntryRules   string     `json:"keep_filter_entry_rules"`
 }
 
 // UserCreationRequest represents the request to create a user.
@@ -48,28 +51,31 @@ type UserCreationRequest struct {
 
 // UserModificationRequest represents the request to update a user.
 type UserModificationRequest struct {
-	Username               *string `json:"username"`
-	Password               *string `json:"password"`
-	Theme                  *string `json:"theme"`
-	Language               *string `json:"language"`
-	Timezone               *string `json:"timezone"`
-	EntryDirection         *string `json:"entry_sorting_direction"`
-	EntryOrder             *string `json:"entry_sorting_order"`
-	Stylesheet             *string `json:"stylesheet"`
-	GoogleID               *string `json:"google_id"`
-	OpenIDConnectID        *string `json:"openid_connect_id"`
-	EntriesPerPage         *int    `json:"entries_per_page"`
-	IsAdmin                *bool   `json:"is_admin"`
-	KeyboardShortcuts      *bool   `json:"keyboard_shortcuts"`
-	ShowReadingTime        *bool   `json:"show_reading_time"`
-	EntrySwipe             *bool   `json:"entry_swipe"`
-	GestureNav             *string `json:"gesture_nav"`
-	DisplayMode            *string `json:"display_mode"`
-	DefaultReadingSpeed    *int    `json:"default_reading_speed"`
-	CJKReadingSpeed        *int    `json:"cjk_reading_speed"`
-	DefaultHomePage        *string `json:"default_home_page"`
-	CategoriesSortingOrder *string `json:"categories_sorting_order"`
-	MarkReadOnView         *bool   `json:"mark_read_on_view"`
+	Username               *string  `json:"username"`
+	Password               *string  `json:"password"`
+	Theme                  *string  `json:"theme"`
+	Language               *string  `json:"language"`
+	Timezone               *string  `json:"timezone"`
+	EntryDirection         *string  `json:"entry_sorting_direction"`
+	EntryOrder             *string  `json:"entry_sorting_order"`
+	Stylesheet             *string  `json:"stylesheet"`
+	GoogleID               *string  `json:"google_id"`
+	OpenIDConnectID        *string  `json:"openid_connect_id"`
+	EntriesPerPage         *int     `json:"entries_per_page"`
+	IsAdmin                *bool    `json:"is_admin"`
+	KeyboardShortcuts      *bool    `json:"keyboard_shortcuts"`
+	ShowReadingTime        *bool    `json:"show_reading_time"`
+	EntrySwipe             *bool    `json:"entry_swipe"`
+	GestureNav             *string  `json:"gesture_nav"`
+	DisplayMode            *string  `json:"display_mode"`
+	DefaultReadingSpeed    *int     `json:"default_reading_speed"`
+	CJKReadingSpeed        *int     `json:"cjk_reading_speed"`
+	DefaultHomePage        *string  `json:"default_home_page"`
+	CategoriesSortingOrder *string  `json:"categories_sorting_order"`
+	MarkReadOnView         *bool    `json:"mark_read_on_view"`
+	MediaPlaybackRate      *float64 `json:"media_playback_rate"`
+	BlockFilterEntryRules  *string  `json:"block_filter_entry_rules"`
+	KeepFilterEntryRules   *string  `json:"keep_filter_entry_rules"`
 }
 
 // Patch updates the User object with the modification request.
@@ -160,6 +166,18 @@ func (u *UserModificationRequest) Patch(user *User) {
 
 	if u.MarkReadOnView != nil {
 		user.MarkReadOnView = *u.MarkReadOnView
+	}
+
+	if u.MediaPlaybackRate != nil {
+		user.MediaPlaybackRate = *u.MediaPlaybackRate
+	}
+
+	if u.BlockFilterEntryRules != nil {
+		user.BlockFilterEntryRules = *u.BlockFilterEntryRules
+	}
+
+	if u.KeepFilterEntryRules != nil {
+		user.KeepFilterEntryRules = *u.KeepFilterEntryRules
 	}
 }
 

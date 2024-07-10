@@ -4,40 +4,19 @@
 package validator // import "miniflux.app/v2/internal/validator"
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
-
-	"miniflux.app/v2/internal/locale"
 )
-
-// ValidationError represents a validation error.
-type ValidationError struct {
-	TranslationKey string
-}
-
-// NewValidationError initializes a validation error.
-func NewValidationError(translationKey string) *ValidationError {
-	return &ValidationError{TranslationKey: translationKey}
-}
-
-func (v *ValidationError) String() string {
-	return locale.NewPrinter("en_US").Printf(v.TranslationKey)
-}
-
-func (v *ValidationError) Error() error {
-	return errors.New(v.String())
-}
 
 // ValidateRange makes sure the offset/limit values are valid.
 func ValidateRange(offset, limit int) error {
 	if offset < 0 {
-		return fmt.Errorf(`Offset value should be >= 0`)
+		return fmt.Errorf(`offset value should be >= 0`)
 	}
 
 	if limit < 0 {
-		return fmt.Errorf(`Limit value should be >= 0`)
+		return fmt.Errorf(`limit value should be >= 0`)
 	}
 
 	return nil
@@ -50,7 +29,7 @@ func ValidateDirection(direction string) error {
 		return nil
 	}
 
-	return fmt.Errorf(`Invalid direction, valid direction values are: "asc" or "desc"`)
+	return fmt.Errorf(`invalid direction, valid direction values are: "asc" or "desc"`)
 }
 
 // IsValidRegex verifies if the regex can be compiled.

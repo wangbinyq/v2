@@ -333,6 +333,54 @@ func TestRewriteWithImageAndLazySrcset(t *testing.T) {
 	}
 }
 
+func TestRewriteWithNoLazyIframe(t *testing.T) {
+	controlEntry := &model.Entry{
+		Title:   `A title`,
+		Content: `<iframe src="https://example.org/embed" allowfullscreen></iframe>`,
+	}
+	testEntry := &model.Entry{
+		Title:   `A title`,
+		Content: `<iframe src="https://example.org/embed" allowfullscreen></iframe>`,
+	}
+	Rewriter("https://example.org/article", testEntry, "add_dynamic_iframe")
+
+	if !reflect.DeepEqual(testEntry, controlEntry) {
+		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)
+	}
+}
+
+func TestRewriteWithLazyIframe(t *testing.T) {
+	controlEntry := &model.Entry{
+		Title:   `A title`,
+		Content: `<iframe data-src="https://example.org/embed" allowfullscreen="" src="https://example.org/embed"></iframe>`,
+	}
+	testEntry := &model.Entry{
+		Title:   `A title`,
+		Content: `<iframe data-src="https://example.org/embed" allowfullscreen></iframe>`,
+	}
+	Rewriter("https://example.org/article", testEntry, "add_dynamic_iframe")
+
+	if !reflect.DeepEqual(testEntry, controlEntry) {
+		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)
+	}
+}
+
+func TestRewriteWithLazyIframeAndSrc(t *testing.T) {
+	controlEntry := &model.Entry{
+		Title:   `A title`,
+		Content: `<iframe src="https://example.org/embed" data-src="https://example.org/embed" allowfullscreen=""></iframe>`,
+	}
+	testEntry := &model.Entry{
+		Title:   `A title`,
+		Content: `<iframe src="about:blank" data-src="https://example.org/embed" allowfullscreen></iframe>`,
+	}
+	Rewriter("https://example.org/article", testEntry, "add_dynamic_iframe")
+
+	if !reflect.DeepEqual(testEntry, controlEntry) {
+		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)
+	}
+}
+
 func TestNewLineRewriteRule(t *testing.T) {
 	controlEntry := &model.Entry{
 		Title:   `A title`,
@@ -450,6 +498,22 @@ func TestRewriteReplaceCustom(t *testing.T) {
 	}
 }
 
+func TestRewriteReplaceTitleCustom(t *testing.T) {
+	controlEntry := &model.Entry{
+		Title:   `Ouch, a thistle`,
+		Content: `The replace_title rewrite rule should not modify the content.`,
+	}
+	testEntry := &model.Entry{
+		Title:   `A title`,
+		Content: `The replace_title rewrite rule should not modify the content.`,
+	}
+	Rewriter("https://example.org/article", testEntry, `replace_title("(?i)^a\\s*ti"|"Ouch, a this")`)
+
+	if !reflect.DeepEqual(testEntry, controlEntry) {
+		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)
+	}
+}
+
 func TestRewriteRemoveCustom(t *testing.T) {
 	controlEntry := &model.Entry{
 		Title:   `A title`,
@@ -556,6 +620,84 @@ func TestRemoveClickbait(t *testing.T) {
 		Content: `Some description`,
 	}
 	Rewriter("https://example.org/article", testEntry, `remove_clickbait`)
+
+	if !reflect.DeepEqual(testEntry, controlEntry) {
+		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)
+	}
+}
+
+func TestAddHackerNewsLinksUsingHack(t *testing.T) {
+	testEntry := &model.Entry{
+		Title: `A title`,
+		Content: `<p>Article URL: <a href="https://example.org/url">https://example.org/article</a></p>
+		<p>Comments URL: <a href="https://news.ycombinator.com/item?id=37620043">https://news.ycombinator.com/item?id=37620043</a></p>
+		<p>Points: 23</p>
+		<p># Comments: 38</p>`,
+	}
+
+	controlEntry := &model.Entry{
+		Title: `A title`,
+		Content: `<p>Article URL: <a href="https://example.org/url">https://example.org/article</a></p>
+		<p>Comments URL: <a href="https://news.ycombinator.com/item?id=37620043">https://news.ycombinator.com/item?id=37620043</a> <a href="hack://item?id=37620043">Open with HACK</a></p>
+		<p>Points: 23</p>
+		<p># Comments: 38</p>`,
+	}
+	Rewriter("https://example.org/article", testEntry, `add_hn_links_using_hack`)
+
+	if !reflect.DeepEqual(testEntry, controlEntry) {
+		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)
+	}
+}
+
+func TestAddHackerNewsLinksUsingOpener(t *testing.T) {
+	testEntry := &model.Entry{
+		Title: `A title`,
+		Content: `<p>Article URL: <a href="https://example.org/url">https://example.org/article</a></p>
+		<p>Comments URL: <a href="https://news.ycombinator.com/item?id=37620043">https://news.ycombinator.com/item?id=37620043</a></p>
+		<p>Points: 23</p>
+		<p># Comments: 38</p>`,
+	}
+
+	controlEntry := &model.Entry{
+		Title: `A title`,
+		Content: `<p>Article URL: <a href="https://example.org/url">https://example.org/article</a></p>
+		<p>Comments URL: <a href="https://news.ycombinator.com/item?id=37620043">https://news.ycombinator.com/item?id=37620043</a> <a href="opener://x-callback-url/show-options?url=https%3A%2F%2Fnews.ycombinator.com%2Fitem%3Fid%3D37620043">Open with Opener</a></p>
+		<p>Points: 23</p>
+		<p># Comments: 38</p>`,
+	}
+	Rewriter("https://example.org/article", testEntry, `add_hn_links_using_opener`)
+
+	if !reflect.DeepEqual(testEntry, controlEntry) {
+		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)
+	}
+}
+
+func TestAddImageTitle(t *testing.T) {
+	testEntry := &model.Entry{
+		Title: `A title`,
+		Content: `
+		<img src="pif" title="pouf">
+		<img src="pif" title="pouf" alt='"onerror=alert(1) a="'>
+		<img src="pif" title="pouf" alt='&quot;onerror=alert(1) a=&quot'>
+		<img src="pif" title="pouf" alt=';&amp;quot;onerror=alert(1) a=;&amp;quot;'>
+		<img src="pif" alt="pouf" title='"onerror=alert(1) a="'>
+		<img src="pif" alt="pouf" title='&quot;onerror=alert(1) a=&quot'>
+		<img src="pif" alt="pouf" title=';&amp;quot;onerror=alert(1) a=;&amp;quot;'>
+		`,
+	}
+
+	controlEntry := &model.Entry{
+		Title: `A title`,
+		Content: `<figure><img src="pif" alt=""/><figcaption><p>pouf</p></figcaption></figure>
+		<figure><img src="pif" alt="" onerror="alert(1)" a=""/><figcaption><p>pouf</p></figcaption></figure>
+		<figure><img src="pif" alt="" onerror="alert(1)" a=""/><figcaption><p>pouf</p></figcaption></figure>
+		<figure><img src="pif" alt=";&#34;onerror=alert(1) a=;&#34;"/><figcaption><p>pouf</p></figcaption></figure>
+		<figure><img src="pif" alt="pouf"/><figcaption><p>&#34;onerror=alert(1) a=&#34;</p></figcaption></figure>
+		<figure><img src="pif" alt="pouf"/><figcaption><p>&#34;onerror=alert(1) a=&#34;</p></figcaption></figure>
+		<figure><img src="pif" alt="pouf"/><figcaption><p>;&amp;quot;onerror=alert(1) a=;&amp;quot;</p></figcaption></figure>
+		`,
+	}
+	Rewriter("https://example.org/article", testEntry, `add_image_title`)
 
 	if !reflect.DeepEqual(testEntry, controlEntry) {
 		t.Errorf(`Not expected output: got "%+v" instead of "%+v"`, testEntry, controlEntry)

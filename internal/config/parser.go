@@ -10,7 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	url_parser "net/url"
+	"log/slog"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -56,7 +57,7 @@ func (p *Parser) parseFileContent(r io.Reader) (lines []string) {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if len(line) > 0 && !strings.HasPrefix(line, "#") && strings.Index(line, "=") > 0 {
+		if !strings.HasPrefix(line, "#") && strings.Index(line, "=") > 0 {
 			lines = append(lines, line)
 		}
 	}
@@ -72,10 +73,26 @@ func (p *Parser) parseLines(lines []string) (err error) {
 		value := strings.TrimSpace(fields[1])
 
 		switch key {
+		case "LOG_FILE":
+			p.opts.logFile = parseString(value, defaultLogFile)
 		case "LOG_DATE_TIME":
 			p.opts.logDateTime = parseBool(value, defaultLogDateTime)
+		case "LOG_LEVEL":
+			parsedValue := parseString(value, defaultLogLevel)
+			if parsedValue == "debug" || parsedValue == "info" || parsedValue == "warning" || parsedValue == "error" {
+				p.opts.logLevel = parsedValue
+			}
+		case "LOG_FORMAT":
+			parsedValue := parseString(value, defaultLogFormat)
+			if parsedValue == "json" || parsedValue == "text" {
+				p.opts.logFormat = parsedValue
+			}
 		case "DEBUG":
-			p.opts.debug = parseBool(value, defaultDebug)
+			slog.Warn("The DEBUG environment variable is deprecated, use LOG_LEVEL instead")
+			parsedValue := parseBool(value, defaultDebug)
+			if parsedValue {
+				p.opts.logLevel = "debug"
+			}
 		case "SERVER_TIMING_HEADER":
 			p.opts.serverTimingHeader = parseBool(value, defaultTiming)
 		case "BASE_URL":
@@ -97,6 +114,8 @@ func (p *Parser) parseLines(lines []string) (err error) {
 			p.opts.databaseMinConns = parseInt(value, defaultDatabaseMinConns)
 		case "DATABASE_CONNECTION_LIFETIME":
 			p.opts.databaseConnectionLifetime = parseInt(value, defaultDatabaseConnectionLifetime)
+		case "FILTER_ENTRY_MAX_AGE_DAYS":
+			p.opts.filterEntryMaxAgeDays = parseInt(value, defaultFilterEntryMaxAgeDays)
 		case "RUN_MIGRATIONS":
 			p.opts.runMigrations = parseBool(value, defaultRunMigrations)
 		case "DISABLE_HSTS":
@@ -127,6 +146,8 @@ func (p *Parser) parseLines(lines []string) (err error) {
 			p.opts.workerPoolSize = parseInt(value, defaultWorkerPoolSize)
 		case "POLLING_FREQUENCY":
 			p.opts.pollingFrequency = parseInt(value, defaultPollingFrequency)
+		case "FORCE_REFRESH_INTERVAL":
+			p.opts.forceRefreshInterval = parseInt(value, defaultForceRefreshInterval)
 		case "BATCH_SIZE":
 			p.opts.batchSize = parseInt(value, defaultBatchSize)
 		case "POLLING_SCHEDULER":
@@ -135,22 +156,47 @@ func (p *Parser) parseLines(lines []string) (err error) {
 			p.opts.schedulerEntryFrequencyMaxInterval = parseInt(value, defaultSchedulerEntryFrequencyMaxInterval)
 		case "SCHEDULER_ENTRY_FREQUENCY_MIN_INTERVAL":
 			p.opts.schedulerEntryFrequencyMinInterval = parseInt(value, defaultSchedulerEntryFrequencyMinInterval)
+		case "SCHEDULER_ENTRY_FREQUENCY_FACTOR":
+			p.opts.schedulerEntryFrequencyFactor = parseInt(value, defaultSchedulerEntryFrequencyFactor)
+		case "SCHEDULER_ROUND_ROBIN_MIN_INTERVAL":
+			p.opts.schedulerRoundRobinMinInterval = parseInt(value, defaultSchedulerRoundRobinMinInterval)
 		case "POLLING_PARSING_ERROR_LIMIT":
 			p.opts.pollingParsingErrorLimit = parseInt(value, defaultPollingParsingErrorLimit)
-		// kept for compatibility purpose
 		case "PROXY_IMAGES":
-			p.opts.proxyOption = parseString(value, defaultProxyOption)
+			slog.Warn("The PROXY_IMAGES environment variable is deprecated, use MEDIA_PROXY_MODE instead")
+			p.opts.mediaProxyMode = parseString(value, defaultMediaProxyMode)
 		case "PROXY_HTTP_CLIENT_TIMEOUT":
-			p.opts.proxyHTTPClientTimeout = parseInt(value, defaultProxyHTTPClientTimeout)
+			slog.Warn("The PROXY_HTTP_CLIENT_TIMEOUT environment variable is deprecated, use MEDIA_PROXY_HTTP_CLIENT_TIMEOUT instead")
+			p.opts.mediaProxyHTTPClientTimeout = parseInt(value, defaultMediaProxyHTTPClientTimeout)
+		case "MEDIA_PROXY_HTTP_CLIENT_TIMEOUT":
+			p.opts.mediaProxyHTTPClientTimeout = parseInt(value, defaultMediaProxyHTTPClientTimeout)
 		case "PROXY_OPTION":
-			p.opts.proxyOption = parseString(value, defaultProxyOption)
+			slog.Warn("The PROXY_OPTION environment variable is deprecated, use MEDIA_PROXY_MODE instead")
+			p.opts.mediaProxyMode = parseString(value, defaultMediaProxyMode)
+		case "MEDIA_PROXY_MODE":
+			p.opts.mediaProxyMode = parseString(value, defaultMediaProxyMode)
 		case "PROXY_MEDIA_TYPES":
-			p.opts.proxyMediaTypes = parseStringList(value, []string{defaultProxyMediaTypes})
-		// kept for compatibility purpose
+			slog.Warn("The PROXY_MEDIA_TYPES environment variable is deprecated, use MEDIA_PROXY_RESOURCE_TYPES instead")
+			p.opts.mediaProxyResourceTypes = parseStringList(value, []string{defaultMediaResourceTypes})
+		case "MEDIA_PROXY_RESOURCE_TYPES":
+			p.opts.mediaProxyResourceTypes = parseStringList(value, []string{defaultMediaResourceTypes})
 		case "PROXY_IMAGE_URL":
-			p.opts.proxyUrl = parseString(value, defaultProxyUrl)
+			slog.Warn("The PROXY_IMAGE_URL environment variable is deprecated, use MEDIA_PROXY_CUSTOM_URL instead")
+			p.opts.mediaProxyCustomURL = parseString(value, defaultMediaProxyURL)
 		case "PROXY_URL":
-			p.opts.proxyUrl = parseString(value, defaultProxyUrl)
+			slog.Warn("The PROXY_URL environment variable is deprecated, use MEDIA_PROXY_CUSTOM_URL instead")
+			p.opts.mediaProxyCustomURL = parseString(value, defaultMediaProxyURL)
+		case "PROXY_PRIVATE_KEY":
+			slog.Warn("The PROXY_PRIVATE_KEY environment variable is deprecated, use MEDIA_PROXY_PRIVATE_KEY instead")
+			randomKey := make([]byte, 16)
+			rand.Read(randomKey)
+			p.opts.mediaProxyPrivateKey = parseBytes(value, randomKey)
+		case "MEDIA_PROXY_PRIVATE_KEY":
+			randomKey := make([]byte, 16)
+			rand.Read(randomKey)
+			p.opts.mediaProxyPrivateKey = parseBytes(value, randomKey)
+		case "MEDIA_PROXY_CUSTOM_URL":
+			p.opts.mediaProxyCustomURL = parseString(value, defaultMediaProxyURL)
 		case "CREATE_ADMIN":
 			p.opts.createAdmin = parseBool(value, defaultCreateAdmin)
 		case "ADMIN_USERNAME":
@@ -178,7 +224,7 @@ func (p *Parser) parseLines(lines []string) (err error) {
 		case "OAUTH2_REDIRECT_URL":
 			p.opts.oauth2RedirectURL = parseString(value, defaultOAuth2RedirectURL)
 		case "OAUTH2_OIDC_DISCOVERY_ENDPOINT":
-			p.opts.oauth2OidcDiscoveryEndpoint = parseString(value, defaultOAuth2OidcDiscoveryEndpoint)
+			p.opts.oidcDiscoveryEndpoint = parseString(value, defaultOAuth2OidcDiscoveryEndpoint)
 		case "OAUTH2_PROVIDER":
 			p.opts.oauth2Provider = parseString(value, defaultOAuth2Provider)
 		case "HTTP_CLIENT_TIMEOUT":
@@ -213,6 +259,8 @@ func (p *Parser) parseLines(lines []string) (err error) {
 			p.opts.metricsPassword = parseString(value, defaultMetricsPassword)
 		case "METRICS_PASSWORD_FILE":
 			p.opts.metricsPassword = readSecretFile(value, defaultMetricsPassword)
+		case "FETCH_NEBULA_WATCH_TIME":
+			p.opts.fetchNebulaWatchTime = parseBool(value, defaultFetchNebulaWatchTime)
 		case "FETCH_ODYSEE_WATCH_TIME":
 			p.opts.fetchOdyseeWatchTime = parseBool(value, defaultFetchOdyseeWatchTime)
 		case "FETCH_YOUTUBE_WATCH_TIME":
@@ -223,10 +271,8 @@ func (p *Parser) parseLines(lines []string) (err error) {
 			p.opts.watchdog = parseBool(value, defaultWatchdog)
 		case "INVIDIOUS_INSTANCE":
 			p.opts.invidiousInstance = parseString(value, defaultInvidiousInstance)
-		case "PROXY_PRIVATE_KEY":
-			randomKey := make([]byte, 16)
-			rand.Read(randomKey)
-			p.opts.proxyPrivateKey = parseBytes(value, randomKey)
+		case "WEBAUTHN":
+			p.opts.webAuthn = parseBool(value, defaultWebAuthn)
 		}
 	}
 
@@ -245,19 +291,19 @@ func parseBaseURL(value string) (string, string, string, error) {
 		value = value[:len(value)-1]
 	}
 
-	url, err := url_parser.Parse(value)
+	parsedURL, err := url.Parse(value)
 	if err != nil {
 		return "", "", "", fmt.Errorf("config: invalid BASE_URL: %w", err)
 	}
 
-	scheme := strings.ToLower(url.Scheme)
+	scheme := strings.ToLower(parsedURL.Scheme)
 	if scheme != "https" && scheme != "http" {
 		return "", "", "", errors.New("config: invalid BASE_URL: scheme must be http or https")
 	}
 
-	basePath := url.Path
-	url.Path = ""
-	return value, url.String(), basePath, nil
+	basePath := parsedURL.Path
+	parsedURL.Path = ""
+	return value, parsedURL.String(), basePath, nil
 }
 
 func parseBool(value string, fallback bool) bool {

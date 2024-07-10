@@ -15,9 +15,10 @@ import (
 	"miniflux.app/v2/internal/http/request"
 	"miniflux.app/v2/internal/http/response/json"
 	"miniflux.app/v2/internal/integration"
+	"miniflux.app/v2/internal/mediaproxy"
 	"miniflux.app/v2/internal/model"
-	"miniflux.app/v2/internal/proxy"
 	"miniflux.app/v2/internal/reader/processor"
+	"miniflux.app/v2/internal/reader/readingtime"
 	"miniflux.app/v2/internal/storage"
 	"miniflux.app/v2/internal/urllib"
 	"miniflux.app/v2/internal/validator"
@@ -35,14 +36,14 @@ func (h *handler) getEntryFromBuilder(w http.ResponseWriter, r *http.Request, b 
 		return
 	}
 
-	entry.Content = proxy.AbsoluteProxyRewriter(h.router, r.Host, entry.Content)
-	proxyOption := config.Opts.ProxyOption()
+	entry.Content = mediaproxy.RewriteDocumentWithAbsoluteProxyURL(h.router, r.Host, entry.Content)
+	proxyOption := config.Opts.MediaProxyMode()
 
 	for i := range entry.Enclosures {
 		if proxyOption == "all" || proxyOption != "none" && !urllib.IsHTTPS(entry.Enclosures[i].URL) {
-			for _, mediaType := range config.Opts.ProxyMediaTypes() {
+			for _, mediaType := range config.Opts.MediaProxyResourceTypes() {
 				if strings.HasPrefix(entry.Enclosures[i].MimeType, mediaType+"/") {
-					entry.Enclosures[i].URL = proxy.AbsoluteProxifyURL(h.router, r.Host, entry.Enclosures[i].URL)
+					entry.Enclosures[i].URL = mediaproxy.ProxifyAbsoluteURL(h.router, r.Host, entry.Enclosures[i].URL)
 					break
 				}
 			}
@@ -147,6 +148,7 @@ func (h *handler) findEntries(w http.ResponseWriter, r *http.Request, feedID int
 	builder.WithOffset(offset)
 	builder.WithLimit(limit)
 	builder.WithTags(tags)
+	builder.WithEnclosures()
 	configureFilters(builder, r)
 
 	entries, err := builder.GetEntries()
@@ -162,7 +164,7 @@ func (h *handler) findEntries(w http.ResponseWriter, r *http.Request, feedID int
 	}
 
 	for i := range entries {
-		entries[i].Content = proxy.AbsoluteProxyRewriter(h.router, r.Host, entries[i].Content)
+		entries[i].Content = mediaproxy.RewriteDocumentWithAbsoluteProxyURL(h.router, r.Host, entries[i].Content)
 	}
 
 	json.OK(w, r, &entriesResponse{Total: count, Entries: entries})
@@ -231,6 +233,60 @@ func (h *handler) saveEntry(w http.ResponseWriter, r *http.Request) {
 	json.Accepted(w, r)
 }
 
+func (h *handler) updateEntry(w http.ResponseWriter, r *http.Request) {
+	var entryUpdateRequest model.EntryUpdateRequest
+	if err := json_parser.NewDecoder(r.Body).Decode(&entryUpdateRequest); err != nil {
+		json.BadRequest(w, r, err)
+		return
+	}
+
+	if err := validator.ValidateEntryModification(&entryUpdateRequest); err != nil {
+		json.BadRequest(w, r, err)
+		return
+	}
+
+	loggedUserID := request.UserID(r)
+	entryID := request.RouteInt64Param(r, "entryID")
+
+	entryBuilder := h.store.NewEntryQueryBuilder(loggedUserID)
+	entryBuilder.WithEntryID(entryID)
+	entryBuilder.WithoutStatus(model.EntryStatusRemoved)
+
+	entry, err := entryBuilder.GetEntry()
+	if err != nil {
+		json.ServerError(w, r, err)
+		return
+	}
+
+	if entry == nil {
+		json.NotFound(w, r)
+		return
+	}
+
+	user, err := h.store.UserByID(loggedUserID)
+	if err != nil {
+		json.ServerError(w, r, err)
+		return
+	}
+
+	if user == nil {
+		json.NotFound(w, r)
+		return
+	}
+
+	entryUpdateRequest.Patch(entry)
+	if user.ShowReadingTime {
+		entry.ReadingTime = readingtime.EstimateReadingTime(entry.Content, user.DefaultReadingSpeed, user.CJKReadingSpeed)
+	}
+
+	if err := h.store.UpdateEntryTitleAndContent(entry); err != nil {
+		json.ServerError(w, r, err)
+		return
+	}
+
+	json.Created(w, r, entry)
+}
+
 func (h *handler) fetchContent(w http.ResponseWriter, r *http.Request) {
 	loggedUserID := request.UserID(r)
 	entryID := request.RouteInt64Param(r, "entryID")
@@ -250,7 +306,7 @@ func (h *handler) fetchContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.store.UserByID(entry.UserID)
+	user, err := h.store.UserByID(loggedUserID)
 	if err != nil {
 		json.ServerError(w, r, err)
 		return
@@ -282,29 +338,46 @@ func (h *handler) fetchContent(w http.ResponseWriter, r *http.Request) {
 	json.OK(w, r, map[string]string{"content": entry.Content})
 }
 
+func (h *handler) flushHistory(w http.ResponseWriter, r *http.Request) {
+	loggedUserID := request.UserID(r)
+	go h.store.FlushHistory(loggedUserID)
+	json.Accepted(w, r)
+}
+
 func configureFilters(builder *storage.EntryQueryBuilder, r *http.Request) {
-	beforeEntryID := request.QueryInt64Param(r, "before_entry_id", 0)
-	if beforeEntryID > 0 {
+	if beforeEntryID := request.QueryInt64Param(r, "before_entry_id", 0); beforeEntryID > 0 {
 		builder.BeforeEntryID(beforeEntryID)
 	}
 
-	afterEntryID := request.QueryInt64Param(r, "after_entry_id", 0)
-	if afterEntryID > 0 {
+	if afterEntryID := request.QueryInt64Param(r, "after_entry_id", 0); afterEntryID > 0 {
 		builder.AfterEntryID(afterEntryID)
 	}
 
-	beforeTimestamp := request.QueryInt64Param(r, "before", 0)
-	if beforeTimestamp > 0 {
-		builder.BeforeDate(time.Unix(beforeTimestamp, 0))
+	if beforePublishedTimestamp := request.QueryInt64Param(r, "before", 0); beforePublishedTimestamp > 0 {
+		builder.BeforePublishedDate(time.Unix(beforePublishedTimestamp, 0))
 	}
 
-	afterTimestamp := request.QueryInt64Param(r, "after", 0)
-	if afterTimestamp > 0 {
-		builder.AfterDate(time.Unix(afterTimestamp, 0))
+	if afterPublishedTimestamp := request.QueryInt64Param(r, "after", 0); afterPublishedTimestamp > 0 {
+		builder.AfterPublishedDate(time.Unix(afterPublishedTimestamp, 0))
 	}
 
-	categoryID := request.QueryInt64Param(r, "category_id", 0)
-	if categoryID > 0 {
+	if beforePublishedTimestamp := request.QueryInt64Param(r, "published_before", 0); beforePublishedTimestamp > 0 {
+		builder.BeforePublishedDate(time.Unix(beforePublishedTimestamp, 0))
+	}
+
+	if afterPublishedTimestamp := request.QueryInt64Param(r, "published_after", 0); afterPublishedTimestamp > 0 {
+		builder.AfterPublishedDate(time.Unix(afterPublishedTimestamp, 0))
+	}
+
+	if beforeChangedTimestamp := request.QueryInt64Param(r, "changed_before", 0); beforeChangedTimestamp > 0 {
+		builder.BeforeChangedDate(time.Unix(beforeChangedTimestamp, 0))
+	}
+
+	if afterChangedTimestamp := request.QueryInt64Param(r, "changed_after", 0); afterChangedTimestamp > 0 {
+		builder.AfterChangedDate(time.Unix(afterChangedTimestamp, 0))
+	}
+
+	if categoryID := request.QueryInt64Param(r, "category_id", 0); categoryID > 0 {
 		builder.WithCategoryID(categoryID)
 	}
 
@@ -315,8 +388,7 @@ func configureFilters(builder *storage.EntryQueryBuilder, r *http.Request) {
 		}
 	}
 
-	searchQuery := request.QueryStringParam(r, "search", "")
-	if searchQuery != "" {
+	if searchQuery := request.QueryStringParam(r, "search", ""); searchQuery != "" {
 		builder.WithSearchQuery(searchQuery)
 	}
 }

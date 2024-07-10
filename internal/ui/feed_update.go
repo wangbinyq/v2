@@ -10,7 +10,6 @@ import (
 	"miniflux.app/v2/internal/http/request"
 	"miniflux.app/v2/internal/http/response/html"
 	"miniflux.app/v2/internal/http/route"
-	"miniflux.app/v2/internal/logger"
 	"miniflux.app/v2/internal/model"
 	"miniflux.app/v2/internal/ui/form"
 	"miniflux.app/v2/internal/ui/session"
@@ -60,23 +59,22 @@ func (h *handler) updateFeed(w http.ResponseWriter, r *http.Request) {
 		FeedURL:         model.OptionalString(feedForm.FeedURL),
 		SiteURL:         model.OptionalString(feedForm.SiteURL),
 		Title:           model.OptionalString(feedForm.Title),
-		CategoryID:      model.OptionalInt64(feedForm.CategoryID),
+		Description:     model.OptionalString(feedForm.Description),
+		CategoryID:      model.OptionalNumber(feedForm.CategoryID),
 		BlocklistRules:  model.OptionalString(feedForm.BlocklistRules),
 		KeeplistRules:   model.OptionalString(feedForm.KeeplistRules),
 		UrlRewriteRules: model.OptionalString(feedForm.UrlRewriteRules),
 	}
 
-	if validationErr := validator.ValidateFeedModification(h.store, loggedUser.ID, feedModificationRequest); validationErr != nil {
-		view.Set("errorMessage", validationErr.TranslationKey)
+	if validationErr := validator.ValidateFeedModification(h.store, loggedUser.ID, feed.ID, feedModificationRequest); validationErr != nil {
+		view.Set("errorMessage", validationErr.Translate(loggedUser.Language))
 		html.OK(w, r, view.Render("edit_feed"))
 		return
 	}
 
 	err = h.store.UpdateFeed(feedForm.Merge(feed))
 	if err != nil {
-		logger.Error("[UI:UpdateFeed] %v", err)
-		view.Set("errorMessage", "error.unable_to_update_feed")
-		html.OK(w, r, view.Render("edit_feed"))
+		html.ServerError(w, r, err)
 		return
 	}
 
