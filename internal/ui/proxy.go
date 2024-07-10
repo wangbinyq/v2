@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"miniflux.app/v2/internal/config"
@@ -95,6 +96,10 @@ func (h *handler) mediaProxy(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get(requestHeaderName) != "" {
 			req.Header.Add(requestHeaderName, r.Header.Get(requestHeaderName))
 		}
+	}
+
+	if strings.HasPrefix(mediaURL, "https://sxchinesegirlz") {
+		req.Header.Add("referer", "https://sxchinesegirlz.one")
 	}
 
 	clt := &http.Client{
