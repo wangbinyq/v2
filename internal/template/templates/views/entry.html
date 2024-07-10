@@ -279,7 +279,9 @@
 {{ if .user }}
 <div class="pagination-entry-bottom">
     <div class="top-action">
-        <a href="#" onclick="window.scrollTo(0, 0)">Top</a>
+        <button class="page-button" onclick="window.scrollTo(0, 0)">
+            <span class="icon-label">Top</span>
+        </button>
     </div>
     {{ template "entry_pagination" . }}
 </div>
