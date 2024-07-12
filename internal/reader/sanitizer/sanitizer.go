@@ -72,7 +72,7 @@ var (
 		"tr":         {},
 		"ul":         {"id"},
 		"var":        {},
-		"video":      {"poster", "height", "width", "src"},
+		"video":      {"poster", "height", "width", "src", "data-source", "data-type"},
 		"wbr":        {},
 	}
 )
