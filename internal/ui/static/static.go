@@ -71,12 +71,12 @@ func GetBinaryFileChecksum(filename string) (string, error) {
 // GenerateStylesheetsBundles creates CSS bundles.
 func GenerateStylesheetsBundles() error {
 	var bundles = map[string][]string{
-		"light_serif":       {"css/light.css", "css/serif.css", "css/common.css", "plyr.css"},
-		"light_sans_serif":  {"css/light.css", "css/sans_serif.css", "css/common.css", "plyr.css"},
-		"dark_serif":        {"css/dark.css", "css/serif.css", "css/common.css", "plyr.css"},
-		"dark_sans_serif":   {"css/dark.css", "css/sans_serif.css", "css/common.css", "plyr.css"},
-		"system_serif":      {"css/system.css", "css/serif.css", "css/common.css", "plyr.css"},
-		"system_sans_serif": {"css/system.css", "css/sans_serif.css", "css/common.css", "plyr.css"},
+		"light_serif":       {"css/light.css", "css/serif.css", "css/common.css", "css/plyr.css"},
+		"light_sans_serif":  {"css/light.css", "css/sans_serif.css", "css/common.css", "css/plyr.css"},
+		"dark_serif":        {"css/dark.css", "css/serif.css", "css/common.css", "css/plyr.css"},
+		"dark_sans_serif":   {"css/dark.css", "css/sans_serif.css", "css/common.css", "css/plyr.css"},
+		"system_serif":      {"css/system.css", "css/serif.css", "css/common.css", "css/plyr.css"},
+		"system_sans_serif": {"css/system.css", "css/sans_serif.css", "css/common.css", "css/plyr.css"},
 	}
 
 	StylesheetBundles = make(map[string][]byte)
