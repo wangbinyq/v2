@@ -75,7 +75,7 @@ var (
 		"u":          {},
 		"ul":         {"id": {}},
 		"var":        {},
-		"video":      {"poster": {}, "height": {}, "width": {}, "src": {}},
+		"video":      {"poster": {}, "height": {}, "width": {}, "src": {}, "data-source": {}, "data-type": {}},
 		"wbr":        {},
 
 		// MathML: https://w3c.github.io/mathml-core/ and https://developer.mozilla.org/en-US/docs/Web/MathML/Reference/Element
