@@ -102,6 +102,10 @@ func (h *handler) mediaProxy(w http.ResponseWriter, r *http.Request) {
 		req.Header.Add("referer", "https://sxchinesegirlz.one")
 	}
 
+	if strings.HasPrefix(mediaURL, "https://www.javbus.com") {
+		req.Header.Add("referer", "https://www.javbus.com")
+	}
+
 	clt := &http.Client{
 		Transport: &http.Transport{
 			IdleConnTimeout: time.Duration(config.Opts.MediaProxyHTTPClientTimeout()) * time.Second,
