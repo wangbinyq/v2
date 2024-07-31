@@ -105,7 +105,10 @@ func (h *handler) mediaProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.HasPrefix(mediaURL, "https://sxchinesegirlz") {
-		req.Header.Add("referer", "https://sxchinesegirlz.one")
+		u, err := url.Parse(mediaURL)
+		if err == nil {
+			req.Header.Add("referer", u.Scheme+"://"+u.Host)
+		}
 	}
 
 	clt := &http.Client{
