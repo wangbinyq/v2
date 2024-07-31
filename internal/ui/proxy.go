@@ -98,11 +98,9 @@ func (h *handler) mediaProxy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if strings.HasPrefix(mediaURL, "https://sxchinesegirlz") {
-		u, err := url.Parse(mediaURL)
-		if err == nil {
-			req.Header.Add("referer", u.Scheme+"://"+u.Host)
-		}
+	if strings.HasPrefix(mediaURL, "https://sxchinesegirlz") || strings.HasPrefix(mediaURL, "https://sxch02")
+	{
+		req.Header.Add("referer", "https://sxchinesegirlz.one")
 	}
 
 	clt := &http.Client{
